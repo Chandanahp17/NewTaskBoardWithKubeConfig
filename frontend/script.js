@@ -1,4 +1,4 @@
-const API = "http://192.168.49.2:30080/api/tasks";
+const API = "${BACKEND_API_URL}";
 
 function loadTasks() {
     fetch(API)
