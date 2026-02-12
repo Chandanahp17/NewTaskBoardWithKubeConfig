@@ -1,4 +1,4 @@
-const API = "http://localhost:8080/api/tasks";
+const API = "http://192.168.49.2:30080/api/tasks";
 
 function loadTasks() {
     fetch(API)
@@ -9,19 +9,21 @@ function loadTasks() {
 
             tasks.forEach(task => {
                 const li = document.createElement("li");
+                li.textContent = `${task.title} - ${task.status} `;
 
-                li.innerHTML = `
-                    ${task.title} - ${task.status}
-                    ${task.status === "PENDING" 
-                        ? `<button onclick="markDone(${task.id})">Mark Done</button>`
-                        : ""}
-                `;
+                if (task.status === "PENDING") {
+                    const btn = document.createElement("button");
+                    btn.textContent = "Mark Done";
+                    btn.addEventListener("click", () => markDone(task.id));
+                    li.appendChild(btn);
+                }
 
                 list.appendChild(li);
             });
         })
         .catch(err => console.error("Error loading tasks:", err));
 }
+
 
 function addTask() {
     const title = document.getElementById("taskTitle").value;
