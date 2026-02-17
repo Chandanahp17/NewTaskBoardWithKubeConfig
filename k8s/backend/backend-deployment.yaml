@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: taskboard-backend:latest
+          image: chandanahp/taskboard-backend:1.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
