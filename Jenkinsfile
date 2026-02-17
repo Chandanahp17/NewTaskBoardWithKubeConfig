@@ -1,88 +1,94 @@
 pipeline {
-    agent { label 'chandana-kube' }
+  agent { label 'chandana-kube' }
 
-    environment {
-        BACKEND_IMAGE = "chandanahp/taskboard-backend"
-        FRONTEND_IMAGE = "chandanahp/taskboard-frontend"
-        K8S_NAMESPACE = "taskboard"
+  environment {
+    DOCKER_REPO = "chandanahp"
+    BACKEND_IMAGE = "taskboard-backend"
+    FRONTEND_IMAGE = "taskboard-frontend"
+  }
+
+  triggers {
+    pollSCM('H/5 * * * *')
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    triggers {
-        pollSCM('H/2 * * * *')
+    stage('Check Docker') {
+      steps {
+        sh "docker --version"
+      }
     }
 
-    stages {
+    stage('Build Backend Image') {
+      steps {
+        sh """
+          docker build -t $DOCKER_REPO/$BACKEND_IMAGE:$BUILD_NUMBER ./backend
+        """
+      }
+    }
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
+    stage('Build Frontend Image') {
+      steps {
+        sh """
+          docker build -t $DOCKER_REPO/$FRONTEND_IMAGE:$BUILD_NUMBER ./frontend
+        """
+      }
+    }
 
-        stage('Check Docker CLI') {
-            steps {
-                sh "docker --version"
-                sh "docker ps -a"
-            }
-        }
-
-        stage('Build Docker Images') {
-            steps {
-                script {
-                    // Use Jenkins build number as image tag
-                    env.IMAGE_TAG = "${BUILD_NUMBER}"
-                }
-                sh """
-                    docker build -t $BACKEND_IMAGE:$IMAGE_TAG backend
-                    docker build -t $FRONTEND_IMAGE:$IMAGE_TAG frontend
-                """
-            }
-        }
-
-        stage('Push Docker Images') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'chandana-dockerhub-creds',
-                        usernameVariable: 'DOCKERHUB_USER',
-                        passwordVariable: 'DOCKERHUB_PASS'
-                    )
-                ]) {
-                    sh """
-                        echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-                        docker push $BACKEND_IMAGE:$IMAGE_TAG
-                        docker push $FRONTEND_IMAGE:$IMAGE_TAG
-                        docker logout
-                    """
-                }
-            }
-        }
-
-        stage('Update Kubernetes Deployments') {
-            steps {
-                sh """
-                    kubectl set image deployment/backend backend=$BACKEND_IMAGE:$IMAGE_TAG -n $K8S_NAMESPACE
-                    kubectl set image deployment/frontend frontend=$FRONTEND_IMAGE:$IMAGE_TAG -n $K8S_NAMESPACE
-                """
-            }
-        }
-
-        stage('Verify Rollout') {
-            steps {
-                sh """
-                    kubectl rollout status deployment/backend -n $K8S_NAMESPACE
-                    kubectl rollout status deployment/frontend -n $K8S_NAMESPACE
-                """
-            }
-        }
-
-        stage('Application Health Check') {
-            steps {
-                sh """
-                    sleep 10
-                    curl -f http://<NODE_IP>:<NODE_PORT> || exit 1
-                """
-            }
+stage('Push Docker Image') {
+    steps {
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'chandana-dockerhub-creds',
+                usernameVariable: 'DOCKERHUB_USER',
+                passwordVariable: 'DOCKERHUB_PASS'
+            )
+        ]) {
+            sh '''
+                echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                docker push chandanahp/taskboard-backend:$BUILD_NUMBER
+                docker push chandanahp/taskboard-frontend:$BUILD_NUMBER
+                docker logout
+            '''
         }
     }
+}
+
+
+    stage('Update K8s Deployment') {
+      steps {
+        sh """
+          kubectl set image deployment/backend \
+          backend=$DOCKER_REPO/$BACKEND_IMAGE:$BUILD_NUMBER -n taskboard
+
+          kubectl set image deployment/frontend \
+          frontend=$DOCKER_REPO/$FRONTEND_IMAGE:$BUILD_NUMBER -n taskboard
+        """
+      }
+    }
+
+    stage('Verify Rollout') {
+      steps {
+        sh """
+          kubectl rollout status deployment/backend -n taskboard
+          kubectl rollout status deployment/frontend -n taskboard
+        """
+      }
+    }
+
+    stage('Check Kubernetes Resources') {
+      steps {
+        sh """
+          kubectl get pods -n taskboard
+          kubectl get svc -n taskboard
+        """
+      }
+    }
+  }
 }
