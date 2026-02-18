@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: chandanahp/taskboard-backend:1.0
-          imagePullPolicy: Never
+          image: chandanahp/taskboard-backend:${IMAGE_TAG}
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:

@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: chandanahp/taskboard-frontend:1.0
-          imagePullPolicy: Never
+          image: chandanahp/taskboard-frontend:${IMAGE_TAG}
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           envFrom:
